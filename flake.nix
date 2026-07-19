@@ -13,7 +13,7 @@
         pkgs.mkShell {
           buildInputs = [
             pkgs.clippy
-            pkgs.cargo
+            pkgs.rustup
             pkgs.rustfmt
             # cargo build requires these
             pkgs.libiconv
