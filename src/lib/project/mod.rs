@@ -150,11 +150,11 @@ impl Application {
         let mut direct = BTreeMap::new();
         direct.insert(
             package::Name::new("elm", "core").unwrap(),
-            Version::new(1, 0, 3),
+            Version::new(1, 0, 5),
         );
         direct.insert(
             package::Name::new("elm", "json").unwrap(),
-            Version::new(1, 1, 3),
+            Version::new(1, 1, 4),
         );
         let deps = AppDependencies {
             direct,
