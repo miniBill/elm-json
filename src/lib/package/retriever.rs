@@ -205,8 +205,8 @@ impl Retriever {
         let mut versions: HashMap<package::Name, Vec<Version>> = HashMap::new();
         let packages_path = Self::packages_path()?;
 
-        // Scan both 0.19.0 and 0.19.1 packages directories
-        for elm_version in &["0.19.0", "0.19.1"] {
+        // Scan 0.19.0, 0.19.1, 0.19.2 packages directories
+        for elm_version in &["0.19.0", "0.19.1", "0.19.2"] {
             let mut path = packages_path.clone();
             path.push(elm_version);
             path.push("packages");
@@ -503,6 +503,7 @@ impl retriever::Retriever for Retriever {
             .ok_or(())
             .or_else(|_| self.read_stored_deps("0.19.0", "", pkg))
             .or_else(|_| self.read_stored_deps("0.19.1", "s", pkg))
+            .or_else(|_| self.read_stored_deps("0.19.2", "s", pkg))
             .or_else(|_| self.read_cached_deps(pkg));
         match from_stored {
             Ok(res) => Ok(res),
