@@ -10,12 +10,21 @@ use anyhow::{bail, Context, Result};
 use clap::ArgMatches;
 use colored::Colorize;
 
-pub fn run(matches: &ArgMatches, offline: bool) -> Result<()> {
-    util::with_elm_json(matches, offline, upgrade_application, |_, _, _| {
-        bail!(Kind::NotSupported)
-    })
+pub async fn run<'a>(matches: &ArgMatches<'a>, offline: bool) -> Result<()> {
+    util::with_elm_json(
+        matches,
+        offline,
+        upgrade_application,
+        async move |_, _, _| bail!(Kind::NotSupported),
+    )
+    .await
 }
-fn upgrade_application(matches: &ArgMatches, offline: bool, info: Application) -> Result<()> {
+
+async fn upgrade_application<'a>(
+    matches: &ArgMatches<'a>,
+    offline: bool,
+    info: Application,
+) -> Result<()> {
     let strictness = if matches.is_present("unsafe") {
         semver::Strictness::Unsafe
     } else {
@@ -23,14 +32,16 @@ fn upgrade_application(matches: &ArgMatches, offline: bool, info: Application) -
     };
     let elm_version = info.elm_version();
 
-    let mut retriever: Retriever =
-        Retriever::new(&elm_version.into(), offline).context(Kind::Unknown)?;
+    let mut retriever: Retriever = Retriever::new(&elm_version.into(), offline)
+        .await
+        .context(Kind::Unknown)?;
 
     retriever.add_deps(&info.dependencies(&strictness));
     retriever.add_deps(&info.test_dependencies(&strictness));
 
     let res = Resolver::new(&mut retriever)
         .solve()
+        .await
         .context(Kind::NoResolution)?;
 
     let direct_deps: Vec<_> = info.dependencies.direct.keys().cloned().collect();

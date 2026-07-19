@@ -11,16 +11,21 @@ use clap::ArgMatches;
 use colored::Colorize;
 use std::collections::{BTreeMap, HashSet};
 
-pub fn run(matches: &ArgMatches, offline: bool) -> Result<()> {
-    util::with_elm_json(matches, offline, uninstall_application, uninstall_package)
+pub async fn run<'a>(matches: &ArgMatches<'a>, offline: bool) -> Result<()> {
+    util::with_elm_json(matches, offline, uninstall_application, uninstall_package).await
 }
 
-fn uninstall_application(matches: &ArgMatches, offline: bool, info: Application) -> Result<()> {
+async fn uninstall_application<'a>(
+    matches: &ArgMatches<'a>,
+    offline: bool,
+    info: Application,
+) -> Result<()> {
     let strictness = semver::Strictness::Exact;
     let elm_version = info.elm_version();
 
-    let mut retriever: Retriever =
-        Retriever::new(&elm_version.into(), offline).context(Kind::Unknown)?;
+    let mut retriever: Retriever = Retriever::new(&elm_version.into(), offline)
+        .await
+        .context(Kind::Unknown)?;
 
     let extras: HashSet<_> = matches
         .values_of_lossy("extra")
@@ -59,6 +64,7 @@ fn uninstall_application(matches: &ArgMatches, offline: bool, info: Application)
 
     let res = Resolver::new(&mut retriever)
         .solve()
+        .await
         .context(Kind::NoResolution)?;
 
     let orig_direct = info
@@ -108,7 +114,11 @@ fn uninstall_application(matches: &ArgMatches, offline: bool, info: Application)
     Ok(())
 }
 
-fn uninstall_package(matches: &ArgMatches, _offline: bool, info: Package) -> Result<()> {
+async fn uninstall_package<'a>(
+    matches: &ArgMatches<'a>,
+    _offline: bool,
+    info: Package,
+) -> Result<()> {
     let extras: HashSet<_> = matches
         .values_of_lossy("extra")
         .unwrap_or_default()

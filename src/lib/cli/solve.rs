@@ -8,16 +8,21 @@ use crate::{
 use anyhow::{Context, Result};
 use clap::ArgMatches;
 
-pub fn run(matches: &ArgMatches, offline: bool) -> Result<()> {
-    util::with_elm_json(matches, offline, solve_application, solve_package)
+pub async fn run<'a>(matches: &ArgMatches<'a>, offline: bool) -> Result<()> {
+    util::with_elm_json(matches, offline, solve_application, solve_package).await
 }
 
-fn solve_application(matches: &ArgMatches, offline: bool, info: Application) -> Result<()> {
+async fn solve_application<'a>(
+    matches: &ArgMatches<'a>,
+    offline: bool,
+    info: Application,
+) -> Result<()> {
     let deps = &info.dependencies(&semver::Strictness::Exact);
     let elm_version = info.elm_version();
 
-    let mut retriever: Retriever =
-        Retriever::new(&elm_version.into(), offline).context(Kind::Unknown)?;
+    let mut retriever: Retriever = Retriever::new(&elm_version.into(), offline)
+        .await
+        .context(Kind::Unknown)?;
     let extras = util::add_extra_deps(matches, &mut retriever);
 
     retriever.add_preferred_versions(
@@ -48,21 +53,23 @@ fn solve_application(matches: &ArgMatches, offline: bool, info: Application) -> 
 
     Resolver::new(&mut retriever)
         .solve()
+        .await
         .context(Kind::NoResolution)
         .and_then(|x| serde_json::to_string(&AppDependencies::from(x)).context(Kind::Unknown))
         .map(|v| println!("{}", v))?;
     Ok(())
 }
 
-fn solve_package(matches: &ArgMatches, offline: bool, info: Package) -> Result<()> {
+async fn solve_package<'a>(matches: &ArgMatches<'a>, offline: bool, info: Package) -> Result<()> {
     let deps = if matches.is_present("test") {
         info.all_dependencies().context(Kind::InvalidElmJson)?
     } else {
         info.dependencies()
     };
 
-    let mut retriever =
-        Retriever::new(&info.elm_version().to_constraint(), offline).context(Kind::Unknown)?;
+    let mut retriever = Retriever::new(&info.elm_version().to_constraint(), offline)
+        .await
+        .context(Kind::Unknown)?;
 
     if matches.is_present("minimize") {
         retriever.minimize();
@@ -74,6 +81,7 @@ fn solve_package(matches: &ArgMatches, offline: bool, info: Package) -> Result<(
 
     Resolver::new(&mut retriever)
         .solve()
+        .await
         .context(Kind::NoResolution)
         .and_then(|x| serde_json::to_string(&AppDependencies::from(x)).context(Kind::Unknown))
         .map(|v| println!("{}", v))?;

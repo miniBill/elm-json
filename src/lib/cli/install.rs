@@ -15,13 +15,14 @@ use colored::Colorize;
 use petgraph::{self, visit::IntoNodeReferences};
 use std::collections::{btree_map::Keys, BTreeMap};
 
-pub fn run(matches: &ArgMatches, offline: bool) -> Result<()> {
-    util::with_elm_json(matches, offline, install_application, install_package)
+pub async fn run<'a>(matches: &ArgMatches<'a>, offline: bool) -> Result<()> {
+    util::with_elm_json(matches, offline, install_application, install_package).await
 }
 
-fn install_package(matches: &ArgMatches, offline: bool, info: Package) -> Result<()> {
-    let mut retriever =
-        Retriever::new(&info.elm_version().to_constraint(), offline).context(Kind::Unknown)?;
+async fn install_package<'a>(matches: &ArgMatches<'a>, offline: bool, info: Package) -> Result<()> {
+    let mut retriever = Retriever::new(&info.elm_version().to_constraint(), offline)
+        .await
+        .context(Kind::Unknown)?;
 
     let deps = info.all_dependencies().context(Kind::InvalidElmJson)?;
     retriever.add_deps(&deps);
@@ -29,6 +30,7 @@ fn install_package(matches: &ArgMatches, offline: bool, info: Package) -> Result
 
     let res = Resolver::new(&mut retriever)
         .solve()
+        .await
         .context(Kind::NoResolution)?;
 
     let mut deps: BTreeMap<_, package::Range> = BTreeMap::new();
@@ -81,12 +83,17 @@ fn install_package(matches: &ArgMatches, offline: bool, info: Package) -> Result
     Ok(())
 }
 
-fn install_application(matches: &ArgMatches, offline: bool, info: Application) -> Result<()> {
+async fn install_application<'a>(
+    matches: &ArgMatches<'a>,
+    offline: bool,
+    info: Application,
+) -> Result<()> {
     let strictness = semver::Strictness::Exact;
     let elm_version = info.elm_version();
 
-    let mut retriever: Retriever =
-        Retriever::new(&elm_version.into(), offline).context(Kind::Unknown)?;
+    let mut retriever: Retriever = Retriever::new(&elm_version.into(), offline)
+        .await
+        .context(Kind::Unknown)?;
 
     let extras = util::add_extra_deps(matches, &mut retriever);
 
@@ -120,6 +127,7 @@ fn install_application(matches: &ArgMatches, offline: bool, info: Application) -
 
     let res = Resolver::new(&mut retriever)
         .solve()
+        .await
         .context(Kind::NoResolution)?;
 
     let extra_direct: Vec<_> = if matches.is_present("test") {

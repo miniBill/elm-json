@@ -78,11 +78,11 @@ where
         }
     }
 
-    pub fn solve(self) -> Result<Graph<Summary<R::PackageId>>, Error> {
+    pub async fn solve(self) -> Result<Graph<Summary<R::PackageId>>, Error> {
         let mut s = self;
 
         info!("beginning dependency resolution");
-        let r = s.solve_loop();
+        let r = s.solve_loop().await;
 
         if r.is_err() {
             info!("solve failed");
@@ -93,7 +93,7 @@ where
         }
     }
 
-    fn solve_loop(&mut self) -> Result<Graph<Summary<R::PackageId>>, Error> {
+    async fn solve_loop(&mut self) -> Result<Graph<Summary<R::PackageId>>, Error> {
         let c: Constraint = self.retriever.root().version().into();
         let pkgs = indexmap!(self.retriever.root().id() => c.complement());
         self.incompatibility(pkgs, IncompatibilityCause::Root);
@@ -101,7 +101,7 @@ where
         let mut next = Some(self.retriever.root().id());
         while let Some(n) = next {
             self.propagate(n)?;
-            next = self.choose_pkg_version();
+            next = self.choose_pkg_version().await;
         }
 
         // To build the tree, we're gonna go through all our dependencies and get their deps,
@@ -117,7 +117,7 @@ where
 
         while let Some(pid) = q.pop_front() {
             // At this point, we know there has to be dependencies for these packages.
-            let deps = self.retriever.incompats(&tree[pid]).unwrap();
+            let deps = self.retriever.incompats(&tree[pid]).await.unwrap();
             for inc in deps {
                 let pkg = inc.deps.get_index(1).unwrap().0;
                 let ver = &self.decisions[pkg];
@@ -381,7 +381,7 @@ where
     }
 
     // 3: Decision making
-    fn choose_pkg_version(&mut self) -> Option<R::PackageId> {
+    async fn choose_pkg_version(&mut self) -> Option<R::PackageId> {
         let mut unsatisfied = self
             .derivations
             .iter()
@@ -413,7 +413,7 @@ where
                 Ok(best) => {
                     let sum = Summary::new(package.0.clone(), best);
                     // We know the package exists, so unwrapping here is fine
-                    let incompats = self.retriever.incompats(&sum).unwrap();
+                    let incompats = self.retriever.incompats(&sum).await.unwrap();
                     let mut conflict = false;
                     for ic in incompats {
                         conflict = conflict

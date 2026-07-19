@@ -70,7 +70,7 @@ impl PackageId {
 }
 
 impl Retriever {
-    pub fn new(elm_version: &Constraint, offline: bool) -> Result<Self> {
+    pub async fn new(elm_version: &Constraint, offline: bool) -> Result<Self> {
         let mut deps_cache = HashMap::new();
 
         deps_cache.insert(
@@ -89,7 +89,7 @@ impl Retriever {
             offline,
         };
 
-        retriever.fetch_versions()?;
+        retriever.fetch_versions().await?;
         Ok(retriever)
     }
 
@@ -125,7 +125,7 @@ impl Retriever {
         count
     }
 
-    fn fetch_versions(&mut self) -> Result<()> {
+    async fn fetch_versions(&mut self) -> Result<()> {
         let file = Self::cache_file()?;
         file.lock_exclusive()?;
 
@@ -134,7 +134,7 @@ impl Retriever {
         if !self.offline {
             let count = Self::count_versions(&versions);
 
-            let remote_versions = self.fetch_remote_versions(count).unwrap_or_else(|_| {
+            let remote_versions = self.fetch_remote_versions(count).await.unwrap_or_else(|_| {
                 warn!("Failed to fetch versions from package.elm-lang.org");
                 HashMap::new()
             });
@@ -305,13 +305,16 @@ impl Retriever {
         Ok(())
     }
 
-    fn fetch_remote_versions(&self, from: usize) -> Result<HashMap<package::Name, Vec<Version>>> {
+    async fn fetch_remote_versions(
+        &self,
+        from: usize,
+    ) -> Result<HashMap<package::Name, Vec<Version>>> {
         debug!("Fetching versions since {}", from);
 
         let url = format!("https://package.elm-lang.org/all-packages/since/{}", from);
-        let response = isahc::get(url)?;
+        let response = reqwest::get(url).await?.text().await?;
 
-        let versions: Vec<String> = serde_json::from_reader(response.into_body())?;
+        let versions: Vec<String> = serde_json::from_str(&response)?;
         let mut res: HashMap<package::Name, Vec<Version>> = HashMap::new();
 
         for entry in &versions {
@@ -337,7 +340,7 @@ impl Retriever {
         self.preferred_versions.extend(versions);
     }
 
-    fn fetch_deps(&mut self, pkg: &Summary) -> Result<Vec<Incompatibility<PackageId>>> {
+    async fn fetch_deps(&mut self, pkg: &Summary) -> Result<Vec<Incompatibility<PackageId>>> {
         debug!("Fetching dependencies for {}@{}", pkg.id, pkg.version);
 
         if self.offline {
@@ -349,8 +352,8 @@ impl Retriever {
             "https://package.elm-lang.org/packages/{}/{}/elm.json",
             pkg.id, pkg.version
         );
-        let response = isahc::get(url)?;
-        let info: package::Package = serde_json::from_reader(response.into_body())?;
+        let response = reqwest::get(url).await?.text().await?;
+        let info: package::Package = serde_json::from_str(&response)?;
 
         let path = Self::cached_json_path(pkg)?;
 
@@ -489,18 +492,22 @@ impl retriever::Retriever for Retriever {
         Self::root()
     }
 
-    fn incompats(&mut self, pkg: &Summary) -> Result<Vec<Incompatibility<Self::PackageId>>> {
+    async fn incompats(&mut self, pkg: &Summary) -> Result<Vec<Incompatibility<Self::PackageId>>> {
         if pkg.id == PackageId::Elm {
             return Ok(Vec::new());
         }
-        self.deps_cache
+        let from_stored = self
+            .deps_cache
             .get(pkg)
             .cloned()
             .ok_or(())
             .or_else(|_| self.read_stored_deps("0.19.0", "", pkg))
             .or_else(|_| self.read_stored_deps("0.19.1", "s", pkg))
-            .or_else(|_| self.read_cached_deps(pkg))
-            .or_else(|_| self.fetch_deps(pkg))
+            .or_else(|_| self.read_cached_deps(pkg));
+        match from_stored {
+            Ok(res) => Ok(res),
+            Err(_) => self.fetch_deps(pkg).await,
+        }
     }
 
     fn count_versions(&self, pkg: &Self::PackageId) -> usize {
