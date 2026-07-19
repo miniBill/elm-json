@@ -8,11 +8,13 @@ use anyhow::{Context, Result};
 use cli::Kind;
 use colored::Colorize;
 use elm_json::cli;
+use tokio;
 use tracing::Level;
 use tracing_subscriber::{self, filter::LevelFilter, layer::SubscriberExt};
 
-fn main() {
-    if let Err(e) = run() {
+#[tokio::main]
+async fn main() {
+    if let Err(e) = run().await {
         eprintln!(
             "\n{}\n",
             cli::util::format_header(&e.to_string().to_uppercase()).red()
@@ -24,7 +26,7 @@ fn main() {
     }
 }
 
-fn run() -> Result<()> {
+async fn run() -> Result<()> {
     ctrlc::set_handler(move || {
         let term = console::Term::stdout();
         let _ = term.show_cursor();
@@ -48,13 +50,13 @@ fn run() -> Result<()> {
     let offline = matches.is_present("offline");
 
     match matches.subcommand() {
-        ("solve", Some(matches)) => cli::solve::run(matches, offline),
-        ("upgrade", Some(matches)) => cli::upgrade::run(matches, offline),
-        ("install", Some(matches)) => cli::install::run(matches, offline),
-        ("uninstall", Some(matches)) => cli::uninstall::run(matches, offline),
+        ("solve", Some(matches)) => cli::solve::run(matches, offline).await,
+        ("upgrade", Some(matches)) => cli::upgrade::run(matches, offline).await,
+        ("install", Some(matches)) => cli::install::run(matches, offline).await,
+        ("uninstall", Some(matches)) => cli::uninstall::run(matches, offline).await,
         ("new", Some(matches)) => cli::new::run(matches),
         ("completions", Some(matches)) => cli::completions::run(matches),
-        ("tree", Some(matches)) => cli::tree::run(matches, offline),
+        ("tree", Some(matches)) => cli::tree::run(matches, offline).await,
         (cmd, matches) => panic!(
             "Received command {} with matches {:#?} but I don't know how to handle this",
             cmd, matches

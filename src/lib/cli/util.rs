@@ -26,19 +26,19 @@ pub fn confirm(prompt: &str, matches: &ArgMatches) -> Result<bool> {
         .map_err(convert::Into::into)
 }
 
-pub fn with_elm_json<A, P>(
-    matches: &ArgMatches,
+pub async fn with_elm_json<'a, A, P>(
+    matches: &ArgMatches<'a>,
     offline: bool,
     run_app: A,
     run_pkg: P,
 ) -> Result<()>
 where
-    A: FnOnce(&ArgMatches, bool, Application) -> Result<()>,
-    P: FnOnce(&ArgMatches, bool, Package) -> Result<()>,
+    A: AsyncFnOnce(&ArgMatches<'a>, bool, Application) -> Result<()>,
+    P: AsyncFnOnce(&ArgMatches<'a>, bool, Package) -> Result<()>,
 {
     match self::read_elm_json(matches)? {
-        Project::Application(app) => run_app(matches, offline, app),
-        Project::Package(pkg) => run_pkg(matches, offline, pkg),
+        Project::Application(app) => run_app(matches, offline, app).await,
+        Project::Package(pkg) => run_pkg(matches, offline, pkg).await,
     }
 }
 

@@ -10,21 +10,21 @@ itertools = "0.9"
 petgraph = "0.5"
 textwrap = "0.12"
 bincode = "1.3.1"
-serde  = { version = "1.0", features = ["derive"] }
+serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 clap = "2.33.3"
 colored = "2.0"
 dialoguer = "0.6"
 dirs = "3.0"
 fs2 = "0.4"
-isahc = { version = "1.6.0", default-features = false, features = ["static-ssl", "static-curl"] }
-curl = {version = "0.4.42", default-features = false, features = ["ssl", "static-curl", "static-ssl", "force-system-lib-on-osx"]}
 ctrlc = "3.1"
 console = "0.12"
 anyhow = "1.0"
 thiserror = "1.0"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+reqwest = { version = "0.13.4", features = ["rustls"] }
+tokio = { version = "1.53.0", features = ["macros", "rt-multi-thread"] }
 
 [dev-dependencies]
 assert_cmd = "2.0.2"

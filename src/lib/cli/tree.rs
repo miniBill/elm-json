@@ -16,16 +16,21 @@ use petgraph::{self, visit::IntoNodeReferences};
 use std::collections::HashSet;
 use std::iter::FromIterator;
 
-pub fn run(matches: &ArgMatches, offline: bool) -> Result<()> {
-    util::with_elm_json(matches, offline, tree_application, tree_package)
+pub async fn run<'a>(matches: &ArgMatches<'a>, offline: bool) -> Result<()> {
+    util::with_elm_json(matches, offline, tree_application, tree_package).await
 }
 
-fn tree_application(matches: &ArgMatches, offline: bool, info: Application) -> Result<()> {
+async fn tree_application<'a>(
+    matches: &ArgMatches<'a>,
+    offline: bool,
+    info: Application,
+) -> Result<()> {
     let mut deps: Vec<_> = info.dependencies(&semver::Strictness::Exact);
     let elm_version = info.elm_version();
 
-    let mut retriever: Retriever =
-        Retriever::new(&elm_version.into(), offline).context(Kind::Unknown)?;
+    let mut retriever: Retriever = Retriever::new(&elm_version.into(), offline)
+        .await
+        .context(Kind::Unknown)?;
 
     retriever.add_preferred_versions(
         info.dependencies
@@ -49,24 +54,27 @@ fn tree_application(matches: &ArgMatches, offline: bool, info: Application) -> R
 
     Resolver::new(&mut retriever)
         .solve()
+        .await
         .map(|v| show_tree(&v, matches.value_of("package")))
         .context(Kind::NoResolution)?;
     Ok(())
 }
 
-fn tree_package(matches: &ArgMatches, offline: bool, info: Package) -> Result<()> {
+async fn tree_package<'a>(matches: &ArgMatches<'a>, offline: bool, info: Package) -> Result<()> {
     let deps = if matches.is_present("test") {
         info.all_dependencies().context(Kind::InvalidElmJson)?
     } else {
         info.dependencies()
     };
 
-    let mut retriever =
-        Retriever::new(&info.elm_version().to_constraint(), offline).context(Kind::Unknown)?;
+    let mut retriever = Retriever::new(&info.elm_version().to_constraint(), offline)
+        .await
+        .context(Kind::Unknown)?;
     retriever.add_deps(&deps);
 
     Resolver::new(&mut retriever)
         .solve()
+        .await
         .map(|v| show_tree(&v, matches.value_of("package")))
         .context(Kind::NoResolution)?;
     Ok(())
